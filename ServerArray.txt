@@ -1,0 +1,121 @@
+import time # Import the time module to handle time-related operations
+            # like sleeping
+import socket # Import the scoket module for network communication
+
+from sense_emu import SenseHat # Import the SenseHat module for interfacing with
+                               # the SenseHat emulator (or hardware in case of sense_hat)
+sense = SenseHat() # Initialise Sense HAT
+
+# Declare colours with their RGB values
+red = (255, 0, 0) # Red colour (RGB format)
+blue = (0, 0, 255) # Blue colour (RGB format)
+orange = (255, 165, 0) # Orange colour (RGB format)
+grey = (85, 85, 85) # Grey colour (RGB format)
+
+# Function for displaying temperature
+def getTemperature() -> object:
+    readings = [] # Declare an empty list (array) to store temperature readings
+    
+    while len(readings) < 10: # Collect 10 readings
+        temperature = sense.temperature # Get the temperature from the Sense HAT
+        temperature = round(temperature, 2) # Round the temperature to 2 decimal places
+                
+        print(f"Temperature: {temperature}°C") # Print the temperature to the console
+        
+        # Display temperature message on Sense HAT based on ranges
+        if temperature > 22: # If temperature is above 22 Celsius
+            sense.show_message("Too hot", text_colour = red, back_colour = grey, scroll_speed = 0.1) # Display "Too hot" on the Sense HAT
+        elif temperature >= 15 and temperature <= 22: # If temperature is between 15 Celsius and 22 Celsius
+            sense.show_message("Comfortable", text_colour = orange, back_colour = grey, scroll_speed = 0.1) # Display "Comfortable" on the Sense HAT
+        else: # If temperature is below 15 Celsius
+            sense.show_message("Cold", text_colour = blue, back_colour = grey, scroll_speed = 0.1) # Display "Cold" on the Sense HAT
+            
+        readings.append(temperature) # Append the reading to the list
+        #time.sleep(5) # Wait 5 seconds before taking the next reading
+        
+    print(f"\nLast 10 readings: {readings}\n") # Print the list of the last 10 readings
+    return readings # Return the list of temperature readings
+
+# Function for displaying humidity
+def getHumidity() -> object:
+    readings = [] # Declare an empty list (array) to store humidity readings
+    
+    while len(readings) < 10: # Collect 10 readings
+        humidity = sense.humidity # Get the humidity from the Sense HAT
+        humidity = round(humidity, 2) # Round the humidity to 2 decimal places
+                    
+        print(f"Humidity: {humidity}%") # Print the humidity to the console
+        
+        # Display humidity message on Sense HAT based on ranges
+        if humidity > 65: # If humidity is above 65 percent
+            sense.show_message("Oppressive", text_colour = red, back_colour = grey, scroll_speed = 0.1) # Display "Oppressive" on the Sense HAT
+        elif humidity >= 55 and humidity <= 65: # If humidity is between 55 percent and 65 percent
+            sense.show_message("Sticky", text_colour = orange, back_colour = grey, scroll_speed = 0.1) # Display "Sticky" on the Sense HAT
+        else: # If humidity is below 55 percent
+            sense.show_message("Dry", text_colour = blue, back_colour = grey, scroll_speed = 0.1) # Display "Dry" on the Sense HAT
+            
+        readings.append(humidity) # Append the reading to the list
+        #time.sleep(5) # Wait 5 seconds before taking the next reading
+        
+    print(f"\nLast 10 readings: {readings}\n") # Print the list of the last 10 readings
+    return readings # Return the list of humidity readings
+
+# Function to start the server
+def startServer() -> object:
+    serverObject = socket.socket() # Create a new socket object for the server
+    print(type(serverObject)) # Print the type of the server object (for debugging)
+
+    server = socket.gethostname() # Get the host name of the machine (for testing purposes)
+    print(server) # Print the server name (for debugging)
+    port = 2003 # Set the port number for the server
+
+    serverObject.bind(("192.168.20.108", port)) # Bind the server object to the IP address and port
+    print("waiting for connection....") # Print a message indicating the server is waiting for connections
+
+    serverObject.listen(5) # Set the server to listen for incoming connections (max 5 clients in the queue)
+                           # It specifies the number of unaccepted connections that the system will allow before
+                           # refusing new connections
+    return serverObject # Return the server object to allow interaction
+
+# Function to interact with the client
+def correspondWithClient(serverObject) -> object:
+    client,addr = serverObject.accept() # Accept an incoming connection from a client
+    print("Got a connection from " + str(addr)) # Print the address of the client (for debugging)
+    
+    data = client.recv(1) # Receive 1 byte of data from the client
+    menu= data.decode("utf-8") # Decode the byte data into a string (menu option)
+
+    print(type(menu)) # Print the type of the menu variable (for debugging)
+    print(menu) # Print the value of the menu
+
+    stringOfNums = "" # Initialise an empty string to store readings
+    data = "" # Initialise an empty string to hold data to be sent to the client 
+
+    # Based on the menu option, get either temperature or humidity readings
+    if menu == "1": # If the value of the menu equals to 1
+        arrayvalues = getTemperature() # Get temperature readings
+    elif menu == "2": # If the value of the menu equals to 2
+        arrayvalues = getHumidity() # Get humidity readings
+        
+    # Convert the array of values into a string
+    for n in arrayvalues:
+        stringOfNums += str(n) + " " # Append each value to the string, separated by space
+    
+    client.send(stringOfNums.encode()) # Send the string of values back to the client as bytes 
+    print(type(client)) # Print the type of the client object (for debugging)    
+
+    time.sleep(1) # Wait 1 second before closing the connection
+    return client # Return the client object to allow closing the connection
+
+# Function to stop the server and close the client connection
+def stopServer(client) -> None:
+    client.close() # Close the client connection
+    #serverObject.close() # Close the server object
+
+# Main entry point for the script
+if __name__ == '__main__':
+    serverObject = startServer() # Start the server
+    while True: # Run the server continuously
+        client = correspondWithClient(serverObject) # Wait for and handle client connection
+        stopServer(client) # Close the client connection
+    serverObject.close() # Close the server object after the loop ends
